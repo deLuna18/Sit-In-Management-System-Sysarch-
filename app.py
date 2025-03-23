@@ -1,7 +1,8 @@
 from flask import Flask, render_template, request, redirect, flash, session, make_response, url_for, jsonify
 import dbhelper, os
+from datetime import datetime, timedelta
 
-from dbhelper import get_student_by_username, update_student_profile, is_idno_exists, get_reservation_by_id_or_student, get_all_student_emails, delete_announcement, getprocess, get_all_registered_students, count_all_registered_students, get_admin_student_reservations,get_weekly_enrollment, get_monthly_enrollment, get_yearly_enrollment, count_all_reservations,search_student,get_reserved_students, get_enrolled_students
+from dbhelper import get_student_by_username, update_student_profile, is_idno_exists, get_reservation_by_id_or_student, get_all_student_emails, delete_announcement, getprocess, get_all_registered_students, count_all_registered_students, get_admin_student_reservations,get_weekly_enrollment, get_monthly_enrollment, get_yearly_enrollment, count_all_reservations,search_student,get_reserved_students, get_enrolled_students, get_registered_students, count_registered_students
 
 from werkzeug.utils import secure_filename
 from PIL import Image  
@@ -242,10 +243,16 @@ def student_dashboard():
         flash("User not found!", "danger")
         return redirect("/login")
 
-    announcements = dbhelper.get_announcements()  
+    session_count = student_info["session_count"]
 
-    return render_template("student_dashboard.html", student=student_info, announcements=announcements)
+    announcements = dbhelper.get_announcements()
 
+    return render_template(
+        "student_dashboard.html", 
+        student=student_info, 
+        announcements=announcements,
+        session_count=session_count 
+    )
 
 # UPLOAD PROFILE PICTURE
 @app.route("/upload_profile_picture", methods=["POST"])
@@ -405,6 +412,15 @@ def student_reservation():
             flash("Please fill out all fields.", "warning")
             return redirect("/student_reservation")
 
+        # Check if the student has remaining sessions
+        if student["session_count"] <= 0:
+            flash("You have no remaining sessions. Contact the admin for assistance.", "danger")
+            return redirect("/student_reservation")
+
+        # Decrement the session count
+        dbhelper.decrement_session_count(idno)
+
+        # Create the reservation
         success = dbhelper.create_reservation(idno, student_name, course, year_level, purpose, lab, time_in, date)
 
         if success:
@@ -489,6 +505,40 @@ def send_email(subject, content):
         print("⚠️ Error sending email:", e)
 
 
+# SESSION 
+@app.route("/request_session", methods=["POST"])
+def request_session():
+    if "user" not in session:
+        flash("Please log in first.", "warning")
+        return redirect("/login")
+
+    student_id = session["idno"]  # Get the student's ID from the session
+
+    # Check if the student has reached the session limit
+    student_info = dbhelper.get_student_by_username(session["user"])
+    if student_info["session_count"] >= 30:
+        flash("You have reached the maximum number of sessions (30).", "danger")
+        return redirect("/student_dashboard")
+
+    # Create a new session
+    start_time = datetime.now()
+    end_time = start_time + timedelta(minutes=30)  # Optional: Session duration
+
+    # Insert the session into the database
+    success = dbhelper.create_session(student_id, start_time, end_time, "active")
+
+    if success:
+        # Increment the student's session count
+        dbhelper.increment_session_count(student_id)
+        flash("Session started successfully!", "success")
+    else:
+        flash("Failed to start session.", "danger")
+
+    return redirect("/student_dashboard")
+
+
+
+
 # =============== ADMIN AREA ===================== ADMIN AREA ======================= ADMIN AREA ============= ADMIN AREA ===============
 
 # ADMIN DASHBOARD
@@ -499,6 +549,110 @@ def admin_dashboard():
     
     announcements = dbhelper.get_announcements() 
     return render_template("admin_dashboard.html", announcements=announcements)
+
+
+# CARDS REPORT
+# TOTAL STUDENTS
+@app.route('/api/total-students')
+def total_students():
+    total = count_all_registered_students()
+    return jsonify({"total_students": total})
+
+# TOTAL SIT-IN REQUESTS
+@app.route("/api/total_reservations", methods=["GET"])
+def get_total_reservations():
+    try:
+        total_reservations = dbhelper.count_all_reservations()
+        print("Total Reservations:", total_reservations) 
+        return jsonify({"total_reservations": total_reservations})
+    except Exception as e:
+        print("Error fetching total reservations:", str(e))
+        return jsonify({"error": "Failed to fetch total reservations"}), 500
+    
+
+
+# ============================= ANNOUNCEMENT AREA =============================
+# DELETE ANNOUNCEMENT
+@app.route('/delete-announcement/<int:announcement_id>', methods=['POST'])
+def delete_announcement(announcement_id):
+    try:
+        success = dbhelper.delete_announcement(announcement_id)
+        if success:
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'message': 'Failed to delete the announcement.'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+# EDIT ANNOUNCEMENT 
+@app.route('/edit-announcement/<int:announcement_id>', methods=['POST'])
+def edit_announcement(announcement_id):
+    try:
+        data = request.get_json()  
+        new_content = data.get('content')
+
+        if not new_content:
+            return jsonify({'success': False, 'message': 'Content cannot be empty.'})
+
+        success = dbhelper.update_announcement(announcement_id, new_content)
+
+        if success:
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'message': 'Failed to update the announcement.'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
+
+
+
+# ACCEPT RESERVATION
+@app.route("/accept_reservation", methods=["POST"])
+def accept_reservation():
+    id_number = request.form.get("idNumber")
+    reservation = dbhelper.get_reservation_by_id(id_number)
+    if not reservation:
+        return jsonify({"error": "Reservation not found"}), 404
+
+    if reservation['status'] == "Accepted":
+        return jsonify({"message": "Reservation already accepted."}), 400
+    
+    dbhelper.update_reservation_status(id_number, "Accepted")
+    return jsonify({"message": "Reservation accepted successfully!"})
+
+# REJECT RESERVATION
+@app.route("/reject_reservation", methods=["POST"])
+def reject_reservation():
+    id_number = request.form.get("idNumber")
+    reservation = dbhelper.get_reservation_by_id(id_number)
+    if not reservation:
+        return jsonify({"error": "Reservation not found"}), 404
+
+    if reservation['status'] == "Rejected":
+        return jsonify({"message": "Reservation already rejected."}), 400
+    
+    dbhelper.update_reservation_status(id_number, "Rejected")
+    return jsonify({"message": "Reservation rejected successfully!"})
+
+# SEARCH STUDENTS NGA NAKA RESERVED NA 
+@app.route("/search_reserved_students", methods=["GET"])
+def search_reserved_students():
+    query = request.args.get('query', '').strip().lower()
+
+    if not query:  
+        return jsonify({"students": []})
+
+    
+    students = dbhelper.get_reserved_students(query)
+
+    if not students: 
+        return jsonify({"students": []})
+
+    return jsonify({"students": students})  
+
+
+
 
 # ADMIN STUDENTS
 @app.route("/admin_students")
@@ -545,111 +699,33 @@ def admin_students():
 
 
 
-
-
-
-
-# DELETE ANNOUNCEMENT
-@app.route('/delete-announcement/<int:announcement_id>', methods=['POST'])
-def delete_announcement(announcement_id):
-    try:
-        success = dbhelper.delete_announcement(announcement_id)
-        if success:
-            return jsonify({'success': True})
-        else:
-            return jsonify({'success': False, 'message': 'Failed to delete the announcement.'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
-# EDIT ANNOUNCEMENT 
-@app.route('/edit-announcement/<int:announcement_id>', methods=['POST'])
-def edit_announcement(announcement_id):
-    try:
-        data = request.get_json()  
-        new_content = data.get('content')
-
-        if not new_content:
-            return jsonify({'success': False, 'message': 'Content cannot be empty.'})
-
-        success = dbhelper.update_announcement(announcement_id, new_content)
-
-        if success:
-            return jsonify({'success': True})
-        else:
-            return jsonify({'success': False, 'message': 'Failed to update the announcement.'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route("/search_reserved_students", methods=["GET"])
-def search_reserved_students():
-    query = request.args.get('query', '').strip().lower()
-
-    if not query:  
-        return jsonify({"students": []})
-
-    
-    students = dbhelper.get_reserved_students(query)
-
-    if not students: 
-        return jsonify({"students": []})
-
-    return jsonify({"students": students})  
-
-
-# ACCEPT RESERVATION
-@app.route("/accept_reservation", methods=["POST"])
-def accept_reservation():
-    id_number = request.form.get("idNumber")
-    reservation = dbhelper.get_reservation_by_id(id_number)
-    if not reservation:
-        return jsonify({"error": "Reservation not found"}), 404
-
-    if reservation['status'] == "Accepted":
-        return jsonify({"message": "Reservation already accepted."}), 400
-    
-    dbhelper.update_reservation_status(id_number, "Accepted")
-    return jsonify({"message": "Reservation accepted successfully!"})
-
-# REJECT RESERVATION
-@app.route("/reject_reservation", methods=["POST"])
-def reject_reservation():
-    id_number = request.form.get("idNumber")
-    reservation = dbhelper.get_reservation_by_id(id_number)
-    if not reservation:
-        return jsonify({"error": "Reservation not found"}), 404
-
-    if reservation['status'] == "Rejected":
-        return jsonify({"message": "Reservation already rejected."}), 400
-    
-    dbhelper.update_reservation_status(id_number, "Rejected")
-    return jsonify({"message": "Reservation rejected successfully!"})
-
-
-
 # ADMIN SIT-IN PAGE
-@app.route("/admin_sit_in")
-def admin_sit_in():
-    if "user" not in session or not dbhelper.is_admin(session["user"]):
-        flash("Please log in as an admin.", "warning")
+@app.route("/sit_in", methods=["POST"])
+def sit_in():
+    if "user" not in session:
+        flash("Please log in first.", "warning")
         return redirect("/login")
 
-    page = request.args.get("page", 1, type=int)
-    per_page = 10
-    offset = (page - 1) * per_page
+    student_id = session["idno"]  # Get the student's ID from the session
 
-    reservations = dbhelper.get_all_reservations_paginated(per_page, offset)
-    total_reservations = dbhelper.count_all_reservations()
+    # Check if the student has sessions remaining
+    student_info = dbhelper.get_student_by_username(session["user"])
+    if student_info["session_count"] <= 0:
+        flash("You have no remaining sessions. Contact the admin for assistance.", "danger")
+        return redirect("/student_dashboard")
 
-    total_pages = (total_reservations + per_page - 1) // per_page  
+    # Decrement the session count
+    success = dbhelper.decrement_session_count(student_id)
 
-    return render_template(
-        "admin_sit_in.html",
-        reservations=reservations,
-        page=page,
-        total_pages=total_pages
-    )
+    if success:
+        flash("Sit-in recorded successfully! Sessions remaining: {}".format(student_info["session_count"] - 1), "success")
+    else:
+        flash("Failed to record sit-in.", "danger")
 
-# ADMIN REPORTS
+    return redirect("/student_dashboard")
+
+
+# ADMIN REPORT CHART
 @app.route('/api/enrollment-data')
 def enrollment_data():
     weekly_data = get_weekly_enrollment()
@@ -668,25 +744,9 @@ def enrollment_data():
 
     return jsonify(formatted_data)
 
-# TOTAL STUDENTS
-@app.route('/api/total-students')
-def total_students():
-    total = count_all_registered_students()
-    return jsonify({"total_students": total})
-
-# TOTAL SIT-IN REQUESTS
-@app.route("/api/total_reservations", methods=["GET"])
-def get_total_reservations():
-    try:
-        total_reservations = dbhelper.count_all_reservations()
-        print("Total Reservations:", total_reservations) 
-        return jsonify({"total_reservations": total_reservations})
-    except Exception as e:
-        print("Error fetching total reservations:", str(e))
-        return jsonify({"error": "Failed to fetch total reservations"}), 500
-    
 
 
+# SEARHC SA
 @app.route('/admin_enrolled_students', methods=['GET'])
 def admin_enrolled_students():
     # Fetch enrolled students based on page and search query
@@ -702,6 +762,32 @@ def admin_enrolled_students():
     
     # Returning data to the template (or as JSON response)
     return render_template('admin_enrolled_students.html', students=students, total_students=total_students)
+
+
+# SEARCH REGISTERED STUDENTS ONLY
+@app.route("/search_registered_students", methods=["GET"])
+def search_registered_students():
+    query = request.args.get('query', '').strip().lower()
+    page = request.args.get('page', 1, type=int)  # Get the page number (default: 1)
+    per_page = 10  # Number of records per page
+    offset = (page - 1) * per_page  # Calculate the offset
+
+    if not query:  # If no search query, return all students with pagination
+        students = get_all_registered_students(limit=per_page, offset=offset)
+        total_students = count_all_registered_students()  # Total number of students
+    else:  # If there's a search query, filter the students with pagination
+        students = get_registered_students(query, limit=per_page, offset=offset)
+        total_students = count_registered_students(query)  # Total number of filtered students
+
+    if not students:  # If no students are found, return an empty list
+        return jsonify({"students": [], "total": 0, "page": page, "per_page": per_page})
+
+    return jsonify({
+        "students": students,
+        "total": total_students,
+        "page": page,
+        "per_page": per_page
+    })
 
 
 if __name__ == "__main__":

@@ -63,10 +63,12 @@ def register_user(idno: int, lastname: str, firstname: str, middlename: str,
     return postprocess(sql, (idno, lastname, firstname, middlename, course, year_level, 
                              email_address, username, password, default_profile_picture, registration_date))
 
+
+
 # GET STUDENT DATA BY USERNAME
 def get_student_by_username(username: str) -> dict:
     sql = """SELECT idno, lastname, firstname, middlename, course, year_level, 
-                    email_address, username, password, profile_picture
+                    email_address, username, password, profile_picture, session_count
              FROM users WHERE username = ?"""
     
     student_list = getprocess(sql, (username,))  
@@ -242,50 +244,87 @@ def update_reservation_status(id_number: str, status: str) -> None:
 
 
 
-
+# GET ALL REGISTERED STUDENTS PARA MA DISPLAY SA TABLE GETDS
+# GET ALL REGISTERED STUDENTS WITH PAGINATION
 def get_all_registered_students(limit=10, offset=0):
     sql = """
-    SELECT idno, firstname, lastname, course, year_level, email_address, username
+    SELECT idno, firstname, middlename, lastname, course, year_level, email_address, username
     FROM users
+    WHERE idno != ?  
+    ORDER BY idno ASC
     LIMIT ? OFFSET ?
     """
-    return getprocess(sql, (limit, offset))
+    admin_id = "428237351"  
+    return getprocess(sql, (admin_id, limit, offset))
+
+# GET REGISTERED STUDENTS WITH PAGINATION (NAKA FILTER NI PARA SA SEARCH BAR)
+def get_registered_students(search_query='', limit=10, offset=0):
+    sql = '''
+        SELECT idno, firstname, lastname, course, year_level, email_address, username, profile_picture
+        FROM users
+        WHERE (idno LIKE ?  
+           OR firstname LIKE ?  
+           OR lastname LIKE ?) 
+           AND idno != ?  
+           ORDER BY idno ASC
+        LIMIT ? OFFSET ?  
+    '''
+    search_term = f"%{search_query}%"
+    admin_id = "428237351"
+    params = (search_term, search_term, search_term, admin_id, limit, offset)
+    return getprocess(sql, params)
 
 
+# TOTAL REGISTERED STUDENTS 
 def count_all_registered_students():
     sql = "SELECT COUNT(*) AS total FROM users"
     result = getprocess(sql)
     return result[0]["total"] if result else 0
 
-
-
-
-def count_all_reservations():
-    sql = "SELECT COUNT(*) AS total FROM reservations"
-    result = getprocess(sql)
-    print("Query Result:", result) 
+# COUNT REGISTERED STUDENTS
+def count_registered_students(search_query=''):
+    sql = '''
+        SELECT COUNT(*) AS total
+        FROM users
+        WHERE (idno LIKE ?  -- Search by ID number
+           OR firstname LIKE ?  -- Search by first name
+           OR lastname LIKE ?)  -- Search by last name
+           AND idno != ?  -- Exclude admin user
+    '''
+    search_term = f"%{search_query}%"
+    admin_id = "428237351"  
+    params = (search_term, search_term, search_term, admin_id)
+    result = getprocess(sql, params)
     return result[0]["total"] if result else 0
 
 
 
+# TOTAL STUDENTS NGA NAKA RESERVATION NA 
+def count_all_reservations():
+    sql = "SELECT COUNT(*) AS total FROM reservations"
+    result = getprocess(sql)
+    return result[0]["total"] if result else 0
 
+# FETCH RESERVED STUDENTS BASED ON SEARCH QUERY
+def get_reserved_students(search_query=''):
+    sql = '''
+        SELECT idno, student_name, course, year_level, purpose, lab, status
+        FROM reservations
+        WHERE student_name LIKE ? 
+           OR course LIKE ? 
+           OR year_level LIKE ?
+           OR idno LIKE ?  -- Adding search by `idno`
+    '''
+    search_term = f"%{search_query}%"
+    params = (search_term, search_term, search_term, search_term)  
+    return getprocess(sql, params)
 
-
-def get_students_with_reservations(query: str) -> list:
-    # Assuming you have a reservations table that links students to their reservations
-    sql = """
-        SELECT s.idno, s.firstname, s.lastname
-        FROM students s
-        JOIN reservations r ON s.idno = r.student_id
-        WHERE LOWER(s.firstname) LIKE ? OR LOWER(s.lastname) LIKE ?
-    """
-    search_pattern = f"%{query}%"
-    return getprocess(sql, (search_pattern, search_pattern))
 
 
 
 
 # THIS IS FOR ADMIN REPORTS - DASHBOARD
+# WEEKLY
 def get_weekly_enrollment():
     sql = """
     SELECT strftime('%W', registration_date) AS week, COUNT(*) AS count
@@ -296,6 +335,8 @@ def get_weekly_enrollment():
     """
     return getprocess(sql)
 
+
+# MONTHLY
 def get_monthly_enrollment():
     sql = """
     SELECT strftime('%m', registration_date) AS month, COUNT(*) AS count
@@ -306,6 +347,7 @@ def get_monthly_enrollment():
     """
     return getprocess(sql)
 
+# YEARLY
 def get_yearly_enrollment():
     sql = """
     SELECT strftime('%Y', registration_date) AS year, COUNT(*) AS count
@@ -348,20 +390,6 @@ def get_enrolled_students(page, per_page, search_query=''):
     return getprocess(sql, params)
 
 
-# Fetch reserved students based on search query
-def get_reserved_students(search_query=''):
-    sql = '''
-        SELECT idno, student_name, course, year_level, purpose, lab, status
-        FROM reservations
-        WHERE student_name LIKE ? 
-           OR course LIKE ? 
-           OR year_level LIKE ?
-           OR idno LIKE ?  -- Adding search by `idno`
-    '''
-    search_term = f"%{search_query}%"
-    params = (search_term, search_term, search_term, search_term)  # Added idno as the fourth search term
-    return getprocess(sql, params)
-
 # Search for students based on query (e.g., name, email, or ID)
 def search_student(query: str) -> list:
     sql = '''
@@ -371,3 +399,29 @@ def search_student(query: str) -> list:
     '''
     search_term = f"%{query}%"
     return getprocess(sql, (search_term, search_term, search_term, search_term))
+
+
+
+
+
+
+
+
+
+
+
+
+def create_session(student_id, start_time, end_time, status):
+    sql = """
+        INSERT INTO sessions (student_id, start_time, end_time, status)
+        VALUES (?, ?, ?, ?)
+    """
+    return postprocess(sql, (student_id, start_time, end_time, status))
+
+def decrement_session_count(student_id):
+    sql = """
+        UPDATE users
+        SET session_count = session_count - 1
+        WHERE idno = ? AND session_count > 0
+    """
+    return postprocess(sql, (student_id,))

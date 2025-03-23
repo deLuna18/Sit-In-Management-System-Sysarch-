@@ -166,6 +166,10 @@
                     <label>Year Level:</label>
                     <input type="text" name="year_level" value="{{ student.year_level }}" disabled>
                 </div>
+                <div class="form-group">
+                    <label>Remaining Sessions:</label>
+                    <input type="text" value="{{ student.session_count }}/30" disabled>
+                </div>
             </div>
 
             <!-- Reservation Details Section -->

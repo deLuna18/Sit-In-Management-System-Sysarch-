@@ -85,173 +85,158 @@
                 </a>
             </li>
         </ul>
-        <!-- <div class="ads">
-            <div class="wrapper">
-                <a href="#" class="btn-upgrade">Upgrade</a>
-                <p>Become a <span>PRO</span> member and enjoy <span>All Features</span></p>
-            </div>
-        </div> -->
+       
     </section>
     <!-- SIDEBAR -->
 
     <section id="content">
-		<!-- NAVBAR -->
-    <nav>
-        <i class='bx bx-menu toggle-sidebar'></i>
+        <!-- NAVBAR [SUD KAY SEARCH BAR]-->
+        <!-- TOP SEARCH BAR  -->
+		<nav>
+			<i class='bx bx-menu toggle-sidebar'></i>
+			<form id="searchForm">
+				<div class="form-group">
+					<input type="text" id="searchInput" placeholder="Search by ID or Last Name...">
+					<button type="button" id="searchBtn" class="search-btn">Search</button>
+				</div>
+			</form>
+		</nav>
+		
+		<button id="openModalBtn" style="display: none;">Open Sit-In Modal</button>
 
-     
+		<!-- MODAL FOR STUDENT SIT-IN [CONNECTED TO SEARCH BAR] -->
+		<div id="sitInModal" 
+			style="
+				display: none;
+				position: fixed; 
+				top: 0; 
+				left: 0; 
+				width: 100%; 
+				height: 100%; 
+				background-color: rgba(0, 0, 0, 0.5); 
+				z-index: 9999; /* Highest priority */
+				justify-content: center; 
+				align-items: center;
+				
+				
 
-        <!-- Modal for Student Sit-In [Connected to Search Bar] -->
-        <div id="sitInModal" 
-            style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 9999; justify-content: center; align-items: center;">
-            <div class="modal-content" 
-                style="background-color: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); width: 100%; max-width: 500px;">
-                <h2>Sit In Form</h2>
-                <label>ID Number:</label>
-                <input type="text" id="idNumber" readonly>
+				">
 
-                <label>Student Name:</label>
-                <input type="text" id="studentName" readonly>
+			<div class="modal-content" 
+				style="
+					
+					background-color: #fff; 
+					padding: 20px; 
+					border-radius: 10px; 
+					box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); 
+					width: 100%; 
+					max-width: 500px;
+					">
+					
+					
+				<h2>Sit In Form</h2>
+			
+				<label>ID Number:</label>
+				<input type="text" id="idNumber" readonly>
 
-                <label>Purpose:</label>
-                <input type="text" id="purpose" readonly>
+				<label>Student Name:</label>
+				<input type="text" id="studentName" readonly>
 
-                <label>Lab:</label>
-                <input type="text" id="lab" readonly>
+				<label>Purpose:</label>
+				<input type="text" id="purpose" readonly>
 
-                <label>Remaining Sessions:</label>
-                <input type="text" id="remainingSessions" readonly>
+				<label>Lab:</label>
+				<input type="text" id="lab" readonly>
 
-                <div style="display: flex; gap: 10px; margin-top: 10px;">
-                    <button id="closeModal" style="background-color: #d9534f; color: #fff; border: none; border-radius: 5px; padding: 8px 20px; cursor: pointer; transition: background 0.3s ease;">
-                        Close
-                    </button>
-                    <button id="acceptBtn" style="background-color: #5cb85c; color: #fff; border: none; border-radius: 5px; padding: 8px 20px; cursor: pointer; transition: background 0.3s ease;">
-                        Accept
-                    </button>
-                    <button id="rejectBtn" style="background-color: #f0ad4e; color: #fff; border: none; border-radius: 5px; padding: 8px 20px; cursor: pointer; transition: background 0.3s ease;">
-                        Reject
-                    </button>
-                </div>
-            </div>
-        </div>
-    </nav>
-		<!-- NAVBAR -->
+				<label>Remaining Sessions:</label>
+				<input type="text" id="remainingSessions" readonly>
+
+				<div style="display: flex; gap: 10px; margin-top: 10px;">
+					<button id="closeModal" style="
+						background-color: #d9534f; 
+						color: #fff; 
+						border: none; 
+						border-radius: 5px; 
+						padding: 8px 20px; 
+						cursor: pointer;
+						transition: background 0.3s ease;">
+						Close
+					</button>
+				
+					<button id="acceptBtn" style="
+						background-color: #5cb85c; 
+						color: #fff; 
+						border: none; 
+						border-radius: 5px; 
+						padding: 8px 20px; 
+						cursor: pointer;
+						transition: background 0.3s ease;">
+						Accept
+					</button>
+				
+					<button id="rejectBtn" style="
+						background-color: #f0ad4e; 
+						color: #fff; 
+						border: none; 
+						border-radius: 5px; 
+						padding: 8px 20px; 
+						cursor: pointer;
+						transition: background 0.3s ease;">
+						Reject
+					</button>
+				</div>
+			</div>
+		</div>
     
-    <div class="container">
 
-        <header>
-
-            <div class="filterEntries">
-                <div class="entries">
-                    Show <select name="" id="table_size">
-                        <option value="10">10</option>
-                        <option value="20">20</option>
-                        <option value="50">50</option>
-                        <option value="100">100</option>
-                    </select> entries
+        <!-- ARI NA MAG SUGOD ANG LIST OF STUDENTS -->
+        <div class="container">
+            <!-- HEADER -->
+            <header>
+                <div class="filterEntries">
+                    <!-- ENTRIES -->
+                    <div class="entries">
+                        Show
+                        <select id="table_size" onchange="updateTableSize()">
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                        entries
+                    </div>
+                    <!-- SEARCH BAR -->
+                    <div class="search-container">
+                        <input type="text" id="registeredSearchInput" placeholder="Search by name, ID, or email...">
+                        <button onclick="searchRegisteredStudents()">Search</button>
+                    </div>
                 </div>
-
-                <div class="search-container">
-                    <input type="text" id="searchInput" placeholder="Search by name, ID, or email (Enrolled Students)">
-                    <button onclick="searchEnrolledStudents()">Search</button>
-                </div>
-
-                <script>
-                    // Function to perform search
-                    function searchEnrolledStudents() {
-                        const searchInput = document.getElementById('searchInput').value;
-                        // Reload the page with the search query and reset to page 1
-                        window.location.href = `/admin_students?page=1&search=${encodeURIComponent(searchInput)}`;
-                    }
-                    
-                    // Function to reset the search, remove search query from URL, and reload the page
-                    function resetSearch() {
-                        // Clear the search input field
-                        document.getElementById('searchInput').value = '';
-                        // Reload the page without the search query (i.e., showing all students)
-                        window.location.href = '/admin_students?page=1';  // Reset to the first page with no search
-                    }
-                </script>
-            </div>
-
-
-            <div class="addMemberBtn">
-                <button>New member</button>
-            </div>
-
-        </header>
-
-
-        <table class="styled-table">
-            <thead>
-                <tr class="heading">
-                    <th>ID No</th>
-                    <th>Full Name</th>
-                    <th>Course</th>
-                    <th>Year Level</th>
-                    <th>Email Address</th>
-                    <th>Username</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for student in students %}
-                    {% if student.idno != '428237351' %}
-                        <tr>
-                            <td>{{ student.idno }}</td>
-                            <td>{{ student.firstname }} {{ student.lastname }}</td>
-                            <td>{{ student.course }}</td>
-                            <td>{{ student.year_level }}</td>
-                            <td>{{ student.email_address }}</td>
-                            <td>{{ student.username }}</td>
-                        </tr>
-                    {% endif %}
-                {% else %}
-                    <tr>
-                        <td colspan="6">No students found.</td>
+            </header>
+            <!-- HEADER -->
+            <!-- TABLE -->
+            <table class="styled-table">
+                <thead>
+                    <tr class="heading">
+                        <th>ID No</th>
+                        <th>Profile Picture</th>
+                        <th>Full Name</th>
+                        <th>Course</th>
+                        <th>Year Level</th>
+                        <th>Email Address</th>
+                        <th>Username</th>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        
-
-
-        <footer>
-            <div class="pagination" 
-                 style="display: flex; justify-content: center; align-items: center; gap: 20px; padding: 20px 0; width: 100%; text-align: center;">
-                <!-- Previous Button -->
-                {% if page > 1 %}
-                    <a href="{{ url_for('admin_students', page=page-1, search=search_query) }}" 
-                       style="display: flex; justify-content: center; align-items: center; padding: 10px 20px; background-color: #603A7E; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; cursor: pointer; transition: background-color 0.3s ease;">
-                        Prev
-                    </a>
-                {% else %}
-                    <span style="display: flex; justify-content: center; align-items: center; padding: 10px 20px; background-color: #e0e0e0; color: #ccc; border-radius: 5px; font-weight: bold;">
-                        Prev
-                    </span>
-                {% endif %}
-        
-                <!-- Page Indicator -->
-                <span style="font-size: 16px; color: #603A7E; font-weight: bold;">
-                    Showing {{ start }} to {{ end }} of {{ total_students }} entries
-                </span>
-        
-                <!-- Next Button -->
-                {% if page < total_pages %}
-                    <a href="{{ url_for('admin_students', page=page+1, search=search_query) }}" 
-                       style="display: flex; justify-content: center; align-items: center; padding: 10px 20px; background-color: #603A7E; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; cursor: pointer; transition: background-color 0.3s ease;">
-                        Next
-                    </a>
-                {% else %}
-                    <span style="display: flex; justify-content: center; align-items: center; padding: 10px 20px; background-color: #e0e0e0; color: #ccc; border-radius: 5px; font-weight: bold;">
-                        Next
-                    </span>
-                {% endif %}
-            </div>
-        </footer>
-        
-        
-    </div>
+                </thead>
+                <tbody id="registeredStudentsTableBody">
+                    
+                </tbody>
+            </table>
+            <!-- FOOTER | PREV | ENTRIES | NEXT -->
+            <footer>
+                <!-- PAGINATION -->
+                <div id="pagination"></div>
+            </footer>
+        </div>
+    </section>
 
     <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
     <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
